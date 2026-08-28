@@ -24,8 +24,8 @@
     - name: Assert correct version
       ansible.builtin.assert:
         that:
-          - "api_response.json.version.number == '8.19.10'"
-        fail_msg: "Expected 8.19.10, got {{ api_response.json.version.number }}"
+          - "api_response.json.version.number == '9.5.2'"
+        fail_msg: "Expected 9.5.2, got {{ api_response.json.version.number }}"
 
     - name: Read deployed log4j2.properties
       ansible.builtin.slurp:
@@ -42,7 +42,7 @@
         path: /usr/share/elasticsearch/modules/repository-s3
       register: module_dir
 
-    - name: Assert repository-s3 is available (bundled as module in ES 8.x)
+    - name: Assert repository-s3 is available (bundled as a module since ES 8)
       ansible.builtin.assert:
         that:
           - module_dir.stat.exists

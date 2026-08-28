@@ -30,11 +30,19 @@
           - "api_response.json.version.number == '9.5.2'"
         fail_msg: "Expected 9.5.2, got {{ api_response.json.version.number }}"
 
-    - name: Assert TLS certificate file exists
+    - name: Stat key and certificate deployed by the role
       ansible.builtin.stat:
-        path: /etc/ssl/certs/test.crt
-      register: cert_stat
+        path: "/etc/elasticsearch/certs/{{ item }}"
+      register: deployed_material
+      loop:
+        - test.crt
+        - test.key
 
-    - name: Verify SSL certificate in place
+    - name: Verify SSL material deployed to the Elasticsearch cert directory
       ansible.builtin.assert:
-        that: cert_stat.stat.exists
+        that:
+          - item.stat.exists
+          - item.stat.pw_name == 'elasticsearch'
+      loop: "{{ deployed_material.results }}"
+      loop_control:
+        label: "{{ item.item }}"

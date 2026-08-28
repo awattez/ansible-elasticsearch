@@ -1,6 +1,7 @@
 ---
 # Upload PEM material (key, certificate, CA) to {{ es_ssl_certificate_path }}.
-# Keys must be unencrypted PEM - no PKCS12, no passphrases (KISS).
+# PEM only - no PKCS12. Encrypted keys are supported: set es_ssl_key_passphrase
+# and it lands in the ES keystore (see xpack/security/elasticsearch-security.yml).
 
 - name: Ensure certificate directory exists
   become: true
