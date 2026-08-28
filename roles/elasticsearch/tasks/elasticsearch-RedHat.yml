@@ -1,0 +1,60 @@
+---
+- name: set fact allow_downgrade to no
+  ansible.builtin.set_fact:
+    allow_downgrade: false
+
+- name: set fact allow_downgrade to yes
+  ansible.builtin.set_fact:
+    allow_downgrade: true
+  when: es_allow_downgrades
+
+- name: RedHat - add Elasticsearch repo
+  become: true
+  ansible.builtin.template:
+    src: 'elasticsearch.repo'
+    dest: '/etc/yum.repos.d/elasticsearch-{{ es_repo_name }}.repo'
+    owner: root
+    group: root
+    mode: "0644"
+  when: es_use_repository and es_add_repository
+
+- name: RedHat - include versionlock
+  ansible.builtin.include_tasks: elasticsearch-RedHat-version-lock.yml
+
+- name: Include optional user and group creation.
+  when: (es_user_id is defined) and (es_group_id is defined)
+  ansible.builtin.include_tasks: elasticsearch-optional-user.yml
+
+- name: RedHat - Install Elasticsearch
+  become: true
+  ansible.builtin.dnf:
+    name: '{{ es_package_name }}{% if es_version is defined and es_version != "" %}-{{ es_version }}{% endif %}'
+    state: present
+    update_cache: true
+    allow_downgrade: "{{ allow_downgrade }}"
+  when: es_use_repository and not ansible_check_mode
+  register: redhat_elasticsearch_install_from_repo
+  notify:
+    - restart elasticsearch
+    - reload systemd configuration
+  until: redhat_elasticsearch_install_from_repo is succeeded
+  retries: 5
+  delay: 10
+  environment:
+    ES_PATH_CONF: "{{ es_conf_dir }}"
+
+- name: set fact es_rpm_url
+  ansible.builtin.set_fact:
+    es_rpm_url: "{{ es_package_url }}-{{ es_version }}-x86_64.rpm"
+
+- name: RedHat - Install Elasticsearch from url
+  become: true
+  ansible.builtin.dnf:
+    name: "{% if es_custom_package_url is defined %}{{ es_custom_package_url }}{% else %}{{ es_rpm_url }}{% endif %}"
+    state: present
+    disable_gpg_check: false
+  when: not es_use_repository
+  register: elasticsearch_install_from_package
+  notify:
+    - restart elasticsearch
+    - reload systemd configuration

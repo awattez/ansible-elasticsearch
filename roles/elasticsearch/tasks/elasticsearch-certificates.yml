@@ -1,0 +1,87 @@
+---
+# Generate a local CA and one cert per node of the {{ es_cluster_group }}
+# inventory group with elasticsearch-certutil on the first node, then
+# distribute the PEM files to every node (flat layout in es_ssl_certificate_path).
+# Ported from the philbudne/ansible-elasticsearch 8.x fork, parameterized.
+
+- name: Generate certificates on the first node
+  become: true
+  delegate_to: "{{ groups[es_cluster_group][0] }}"
+  run_once: true
+  block:
+    - name: Ensure certificate directory exists
+      ansible.builtin.file:
+        path: "{{ es_ssl_certificate_path }}"
+        state: directory
+        owner: root
+        group: "{{ es_group }}"
+        mode: "0750"
+
+    - name: Ensure unzip is available
+      ansible.builtin.package:
+        name: unzip
+        state: present
+
+    - name: Generate instances file
+      ansible.builtin.template:
+        src: instances.yml.j2
+        dest: "{{ es_ssl_certificate_path }}/instances.yml"
+        owner: root
+        group: "{{ es_group }}"
+        mode: "0660"
+
+    - name: Generate CA and per-node certificates
+      ansible.builtin.shell: |
+        {{ es_home }}/bin/elasticsearch-certutil ca --days 7300 --pem --silent --out {{ es_ssl_certificate_path }}/ca.zip
+        unzip -o ca.zip
+        {{ es_home }}/bin/elasticsearch-certutil cert --days 3650 --silent --pem \
+          --ca-cert {{ es_ssl_certificate_path }}/ca/ca.crt \
+          --ca-key {{ es_ssl_certificate_path }}/ca/ca.key \
+          --in {{ es_ssl_certificate_path }}/instances.yml \
+          --out {{ es_ssl_certificate_path }}/nodes.zip
+        unzip -o nodes.zip
+        rm ca.zip nodes.zip
+        chmod 440 ca/ca.key
+      args:
+        chdir: "{{ es_ssl_certificate_path }}"
+        creates: "{{ es_ssl_certificate_path }}/{{ groups[es_cluster_group][0] }}"
+
+- name: Read generated certificates from the first node
+  become: true
+  ansible.builtin.slurp:
+    src: "{{ es_ssl_certificate_path }}/{{ item }}"
+  register: generated_certificates
+  delegate_to: "{{ groups[es_cluster_group][0] }}"
+  loop:
+    - "{{ inventory_hostname }}/{{ inventory_hostname }}.crt"
+    - "{{ inventory_hostname }}/{{ inventory_hostname }}.key"
+    - ca/ca.crt
+
+- name: Ensure certificate directory exists on every node
+  become: true
+  ansible.builtin.file:
+    path: "{{ es_ssl_certificate_path }}"
+    state: directory
+    owner: root
+    group: "{{ es_group }}"
+    mode: "0750"
+
+- name: Distribute cert, key and CA to every node
+  become: true
+  ansible.builtin.copy:
+    dest: "{{ es_ssl_certificate_path }}/{{ item.item | basename }}"
+    content: "{{ item.content | b64decode }}"
+    owner: root
+    group: "{{ es_group }}"
+    mode: "0640"
+  loop: "{{ generated_certificates.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  notify: restart elasticsearch
+
+- name: Point the role SSL variables at the generated files
+  ansible.builtin.set_fact:
+    es_ssl_key: "{{ inventory_hostname }}.key"
+    es_ssl_certificate: "{{ inventory_hostname }}.crt"
+    es_ssl_certificate_authority: "ca.crt"
+    es_ssl_upload: false

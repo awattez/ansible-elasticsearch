@@ -1,0 +1,11 @@
+# Managed by Ansible (awattez.elastic collection).
+{% if kibana_config %}
+{{ kibana_config | to_nice_yaml(indent=2) }}
+{% endif %}
+
+{% if kibana_config['server.host'] is not defined %}
+server.host: "0.0.0.0"
+{% endif %}
+{% if kibana_config['elasticsearch.hosts'] is not defined %}
+elasticsearch.hosts: ["http://localhost:9200"]
+{% endif %}

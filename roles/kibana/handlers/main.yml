@@ -1,0 +1,10 @@
+---
+- name: restart kibana
+  become: true
+  ansible.builtin.service:
+    name: kibana
+    state: restarted
+    enabled: true
+  when:
+    - kibana_restart_on_change
+    - kibana_start_service

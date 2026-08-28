@@ -1,0 +1,21 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  roles:
+    - role: awattez.elastic.elasticsearch
+      vars:
+        es_version: "9.5.2"
+        es_version_lock: true
+        es_api_basic_auth_username: elastic
+        es_api_basic_auth_password: "changeme"
+        es_enable_http_ssl: true
+        es_enable_transport_ssl: true
+        es_ssl_key: /etc/ssl/private/test.key
+        es_ssl_certificate: /etc/ssl/certs/test.crt
+        es_ssl_remote_src: true
+        es_validate_certs: true
+        # discovery/network.host computed by the role (single host).
+        es_config:
+          http.port: 9200
+          transport.port: 9300

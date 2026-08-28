@@ -1,0 +1,84 @@
+---
+- name: Debian - Install Elastic repository
+  when: ansible_os_family == 'Debian' and es_use_repository and es_add_repository
+  become: true
+  block:
+    - name: Debian - Install repository prerequisites
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - gnupg
+          - curl
+        state: present
+
+    - name: Debian - Add Elastic PGP key as a dearmored keyring
+      ansible.builtin.shell: |
+        set -o pipefail
+        curl -fsSL {{ es_apt_key_url }} | gpg --dearmor -o {{ es_apt_keyring }}
+      args:
+        creates: "{{ es_apt_keyring }}"
+        executable: /bin/bash
+
+    - name: Debian - Add Elastic repository
+      ansible.builtin.apt_repository:
+        repo: "{{ es_apt_url }}"
+        state: present
+        filename: "elastic-{{ es_repo_name }}"
+
+- name: RedHat - Add Elastic repo
+  become: true
+  ansible.builtin.template:
+    src: kibana.repo
+    dest: "/etc/yum.repos.d/elasticsearch-{{ es_repo_name }}.repo"
+    owner: root
+    group: root
+    mode: "0644"
+  when: ansible_os_family == 'RedHat' and es_use_repository and es_add_repository
+
+- name: Debian - Ensure kibana is installed
+  become: true
+  ansible.builtin.apt:
+    name: '{{ kibana_package_name }}{% if es_version is defined and es_version != "" %}={{ es_version }}{% endif %}'
+    state: present
+    cache_valid_time: 86400
+  when: ansible_os_family == 'Debian'
+  notify: restart kibana
+
+- name: RedHat - Ensure kibana is installed
+  become: true
+  ansible.builtin.dnf:
+    name: '{{ kibana_package_name }}{% if es_version is defined and es_version != "" %}-{{ es_version }}{% endif %}'
+    state: present
+    update_cache: true
+  when: ansible_os_family == 'RedHat'
+  notify: restart kibana
+
+- name: Copy kibana.yml
+  become: true
+  ansible.builtin.template:
+    src: kibana.yml.j2
+    dest: "{{ kibana_conf_dir }}/kibana.yml"
+    owner: root
+    group: kibana
+    mode: "0660"
+    force: true
+  notify: restart kibana
+
+- name: flush handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Make sure kibana is started
+  become: true
+  ansible.builtin.service:
+    name: kibana
+    state: started
+    enabled: true
+  when: kibana_start_service
+
+- name: Wait for kibana to be reachable
+  ansible.builtin.wait_for:
+    host: "127.0.0.1"
+    port: "{{ kibana_config['server.port'] | default(5601) }}"
+    delay: 5
+    timeout: 180
+  when: kibana_start_service and kibana_wait_for_ready

@@ -1,0 +1,8 @@
+---
+# Deploy Elasticsearch on the hosts of the `elasticsearch` inventory group.
+#   ansible-playbook -i inventory.yml awattez.elastic.elasticsearch
+- name: Deploy Elasticsearch
+  hosts: elasticsearch
+  become: true
+  roles:
+    - role: awattez.elastic.elasticsearch

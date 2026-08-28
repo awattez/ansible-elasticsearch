@@ -1,0 +1,75 @@
+---
+# Check for mandatory parameters
+
+- name: fail when es_proxy_port is not defined or is blank
+  ansible.builtin.fail:
+    msg: "es_proxy_port must be specified and cannot be blank when es_proxy_host is defined"
+  when: (es_proxy_port is not defined or es_proxy_port == '') and (es_proxy_host is defined and es_proxy_host != '')
+
+# If the user attempts to lock memory they must specify a heap size
+- name: fail when heap size is not specified when using memory lock
+  ansible.builtin.fail:
+    msg: "If locking memory with bootstrap.memory_lock a heap size must be specified"
+  when: es_config['bootstrap.memory_lock'] is defined and (es_config['bootstrap.memory_lock'] | bool) and es_heap_size is not defined and not ansible_check_mode
+
+- name: fail when password is not declared when using security
+  ansible.builtin.fail:
+    msg: "Enabling security requires an es_api_basic_auth_username and es_api_basic_auth_password to be provided to allow cluster operations"
+  when:
+    - es_api_basic_auth_username is defined
+    - es_api_basic_auth_password is not defined
+
+- name: fail when api credentials are not declared when using tls
+  ansible.builtin.fail:
+    msg: "Enabling tls requires an es_api_basic_auth_username and es_api_basic_auth_password"
+  when:
+    - es_enable_http_ssl or es_enable_transport_ssl
+    - es_api_basic_auth_username is not defined or es_api_basic_auth_password is not defined
+
+# Only reachable when es_certificates is explicitly forced to false: by
+# default it turns itself on when TLS is enabled without es_ssl_* material
+# (self-signed CA + per-node certs).
+- name: fail when ssl enabled without certificates nor generation
+  ansible.builtin.fail:
+    msg: >-
+      SSL/TLS is enabled with es_certificates: false but without
+      es_ssl_key/es_ssl_certificate (PEM). Provide the material or drop
+      es_certificates: false to let the role generate a CA + per-node certs.
+  when:
+    - es_enable_http_ssl or es_enable_transport_ssl
+    - not (es_certificates | bool)
+    - es_ssl_key == "" or es_ssl_certificate == ""
+
+# Effective single-node: explicit discovery.type, or a one-host
+# es_cluster_group with no explicit discovery (the template then renders
+# discovery.type: single-node automatically).
+- name: set fact es_effective_single_node
+  ansible.builtin.set_fact:
+    es_effective_single_node: >-
+      {{ (es_config['discovery.type'] | default('')) == 'single-node'
+         or (es_config['discovery.type'] is not defined
+             and es_config['discovery.seed_hosts'] is not defined
+             and es_config['discovery.seed_providers'] is not defined
+             and (groups[es_cluster_group] | default([inventory_hostname])) | length == 1) }}
+
+# Since 8.0, security is enabled by default and multi-node clusters refuse to
+# form without TLS on the transport layer. Fail early with a clear message
+# instead of letting Elasticsearch fail its bootstrap checks.
+- name: fail when security is enabled on a multi-node cluster without transport TLS
+  ansible.builtin.fail:
+    msg: >-
+      Elasticsearch {{ es_version }} enables security by default and requires
+      TLS on the transport layer for multi-node clusters. Either set
+      es_enable_transport_ssl: true (a CA + per-node certs are generated if
+      you provide no es_ssl_* material), or use discovery.type: single-node,
+      or explicitly disable security with
+      es_config['xpack.security.enabled']: false.
+  when:
+    - es_api_basic_auth_username is defined
+    - not (es_effective_single_node | bool)
+    - (es_config['xpack.security.enabled'] | default(true)) | bool
+    - not es_enable_transport_ssl
+
+- name: set fact m_lock_enabled
+  ansible.builtin.set_fact:
+    m_lock_enabled: "{{ es_config['bootstrap.memory_lock'] is defined and (es_config['bootstrap.memory_lock'] | bool) }}"

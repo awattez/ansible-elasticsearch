@@ -1,0 +1,11 @@
+# Managed by Ansible (awattez.elastic).
+# Heap sizing and extra JVM flags - overrides the packaged jvm.options.
+# https://www.elastic.co/docs/reference/elasticsearch/jvm-settings
+
+{% if es_heap_size is defined %}
+-Xms{{ es_heap_size }}
+-Xmx{{ es_heap_size }}
+{% endif %}
+{% for item in es_jvm_custom_parameters %}
+{{ item }}
+{% endfor %}

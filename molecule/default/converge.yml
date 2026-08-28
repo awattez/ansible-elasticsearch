@@ -1,0 +1,16 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  roles:
+    - role: awattez.elastic.elasticsearch
+      vars:
+        es_version: "9.5.2"
+        es_version_lock: true
+        # discovery.type: single-node and network.host are computed by the
+        # role (single host in the group).
+        es_config:
+          xpack.security.enabled: false
+          xpack.security.http.ssl.enabled: false
+          xpack.security.transport.ssl.enabled: false
+          http.port: 9200

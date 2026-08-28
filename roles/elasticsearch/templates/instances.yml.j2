@@ -1,0 +1,20 @@
+instances:
+{% for host in (groups[es_cluster_group] | map('extract', hostvars)) %}
+  - name: {{ host.inventory_hostname }}
+    dns:
+      - {{ host.inventory_hostname }}
+{% if host.es_domain is defined %}
+      - {{ host.es_domain }}
+{% endif %}
+{% if host.ansible_host is defined and host.ansible_host != host.inventory_hostname and host.ansible_host is not match('^[0-9.]+$') %}
+      - {{ host.ansible_host }}
+{% endif %}
+    ip:
+      - 127.0.0.1
+{% if host.ansible_default_ipv4 is defined and host.ansible_default_ipv4.address is defined %}
+      - {{ host.ansible_default_ipv4.address }}
+{% endif %}
+{% if host.ansible_host is defined and host.ansible_host is match('^[0-9.]+$') and (host.ansible_default_ipv4 is not defined or host.ansible_host != host.ansible_default_ipv4.address) %}
+      - {{ host.ansible_host }}
+{% endif %}
+{% endfor %}

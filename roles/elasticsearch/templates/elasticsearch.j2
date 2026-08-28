@@ -1,0 +1,28 @@
+################################
+# Elasticsearch
+################################
+
+# Elasticsearch home directory
+ES_HOME={{ es_home }}
+
+# Elasticsearch temp directory
+ES_TMPDIR={{ es_tmp_dir }}
+
+# Elasticsearch Java path (empty = bundled JDK)
+{% if es_java_home | length > 0 %}
+ES_JAVA_HOME={{ es_java_home }}
+{% else %}
+#ES_JAVA_HOME=
+{% endif %}
+
+# Elasticsearch configuration directory
+ES_PATH_CONF={{ es_conf_dir }}
+
+# Elasticsearch PID directory
+PID_DIR={{ es_pid_dir }}
+
+# Additional Java OPTS
+ES_JAVA_OPTS="{% if es_proxy_host is defined and es_proxy_host != '' %}-Dhttp.proxyHost={{ es_proxy_host }} -Dhttp.proxyPort={{ es_proxy_port }} -Dhttps.proxyHost={{ es_proxy_host }} -Dhttps.proxyPort={{ es_proxy_port }}{% endif %}"
+
+# Configure restart on package upgrade (true, every other setting will lead to not restarting)
+#RESTART_ON_UPGRADE=true

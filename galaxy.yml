@@ -1,0 +1,29 @@
+---
+namespace: awattez
+name: elastic
+version: 1.0.0
+readme: README.md
+authors:
+  - awattez
+description: >-
+  Deploy and operate the Elastic stack 9.x (Elasticsearch, Kibana) on
+  Debian/Ubuntu and RHEL-family hosts from the official Elastic packages.
+  Fork of the archived elastic/ansible-elasticsearch role, repackaged as a
+  collection with batteries-included playbooks (all, elasticsearch, kibana).
+license_file: LICENSE
+tags:
+  - elastic
+  - elasticsearch
+  - elk
+  - logging
+  - infrastructure
+repository: https://github.com/awattez/ansible-elasticsearch
+documentation: https://github.com/awattez/ansible-elasticsearch/blob/next/GUIDE.md
+homepage: https://github.com/awattez/ansible-elasticsearch
+issues: https://github.com/awattez/ansible-elasticsearch/issues
+build_ignore:
+  - .ansible
+  - molecule
+  - .github
+  - .ansible-lint
+  - requirements.txt

@@ -1,0 +1,96 @@
+---
+# Target Elasticsearch version (exact package version).
+es_version: "9.5.2"
+es_major_version: "{{ es_version.split('.')[0] }}.x"
+es_repo_name: "{{ es_major_version }}"
+es_package_name: "elasticsearch"
+es_version_lock: false
+
+# Package repository (official Elastic 9.x repos).
+# Installation is package-only (APT/YUM repo or direct .deb/.rpm URL).
+es_use_repository: true
+es_add_repository: true
+es_repo_base: "https://artifacts.elastic.co"
+es_apt_key_url: "{{ es_repo_base }}/GPG-KEY-elasticsearch"
+es_apt_keyring: "/usr/share/keyrings/elasticsearch-keyring.gpg"
+es_apt_url: "deb [signed-by={{ es_apt_keyring }}] {{ es_repo_base }}/packages/{{ es_repo_name }}/apt stable main"
+# Alternative to the repository: direct package URL (set es_use_repository: false).
+# es_custom_package_url: https://downloads.example.com/elasticsearch.deb
+
+# Service behaviour.
+es_start_service: true
+es_restart_on_change: true
+
+# System user/group (created by the package).
+es_user: elasticsearch
+es_group: elasticsearch
+# es_user_id / es_group_id: set both to force specific ids (optional).
+
+# elasticsearch.yml is rendered from this map - any ES setting goes here.
+# Computed when absent: node.name, cluster.name, network.host (0.0.0.0) and
+# discovery (single-node for a 1-host es_cluster_group, otherwise
+# seed_hosts + initial_master_nodes derived from the group).
+es_config: {}
+es_config_default: "elasticsearch.j2"
+es_config_log4j2: ""
+
+# Directories.
+es_conf_dir: "/etc/elasticsearch"
+es_pid_dir: "/var/run/elasticsearch"
+es_tmp_dir: "/tmp"
+es_data_dirs:
+  - "/var/lib/elasticsearch"
+es_log_dir: "/var/log/elasticsearch"
+
+es_action_auto_create_index: true
+es_max_open_files: 65536
+es_max_map_count: 262144
+es_allow_downgrades: false
+
+# Plugins.
+es_plugins_reinstall: false
+# es_plugins:
+#   - plugin: analysis-icu
+
+# License.
+es_xpack_trial: false
+# es_xpack_license: "{{ lookup('file', 'license.json') }}"
+
+# Internal API access used by the role itself (passwords, license...).
+es_api_scheme: "{{ 'https' if es_enable_http_ssl else 'http' }}"
+es_api_host: "localhost"
+es_api_port: 9200
+es_api_uri: "{{ es_api_scheme }}://{{ es_api_host }}:{{ es_api_port }}"
+es_license_api: "_license"
+# es_api_basic_auth_username / es_api_basic_auth_password: required as soon as
+# security is on (always the case in 9.x unless explicitly disabled).
+
+# Passwords of existing users (built-in ones like kibana_system included),
+# set through the security API. user -> password.
+es_user_passwords: {}
+
+# JVM: heap and extra flags land in {{ es_conf_dir }}/jvm.options.d/heap.options.
+# es_heap_size: 1g
+es_java_home: ''
+es_jvm_custom_parameters: []
+
+# SSL/TLS - PEM material only (no PKCS12). Two options:
+# A. bring your own key + cert (+ CA); es_ssl_key_passphrase if the key is
+#    encrypted (stored as secure_key_passphrase in the ES keystore),
+# B. provide nothing: a self-signed CA + per-node certs are generated with
+#    elasticsearch-certutil on the first node of es_cluster_group -
+#    es_certificates defaults to true as soon as TLS is enabled without
+#    es_ssl_key/es_ssl_certificate.
+es_enable_http_ssl: false
+es_enable_transport_ssl: false
+es_certificates: "{{ (es_enable_http_ssl or es_enable_transport_ssl) and not (es_ssl_key | length > 0 and es_ssl_certificate | length > 0) }}"
+es_cluster_group: elasticsearch
+es_ssl_key: ""
+es_ssl_key_passphrase: ""
+es_ssl_certificate: ""
+es_ssl_certificate_authority: ""
+es_ssl_remote_src: false
+es_ssl_upload: true
+es_ssl_certificate_path: "{{ es_conf_dir }}/certs"
+es_ssl_verification_mode: "certificate"
+es_validate_certs: "yes"

@@ -1,0 +1,40 @@
+---
+# Upload PEM material (key, certificate, CA) to {{ es_ssl_certificate_path }}.
+# Keys must be unencrypted PEM - no PKCS12, no passphrases (KISS).
+
+- name: Ensure certificate directory exists
+  become: true
+  ansible.builtin.file:
+    dest: "{{ es_ssl_certificate_path }}"
+    state: directory
+    owner: root
+    group: "{{ es_group }}"
+    mode: "0750"
+  when: es_ssl_upload | bool
+
+- name: Upload SSL/TLS key and certificate
+  become: true
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ es_ssl_certificate_path }}/{{ item | basename }}"
+    owner: "{{ es_user }}"
+    group: "{{ es_group }}"
+    mode: "0640"
+    remote_src: "{{ es_ssl_remote_src }}"
+  with_items:
+    - "{{ es_ssl_key }}"
+    - "{{ es_ssl_certificate }}"
+  when: es_ssl_upload | bool and es_ssl_key | length > 0 and es_ssl_certificate | length > 0
+  notify: restart elasticsearch
+
+- name: Upload SSL Certificate Authority
+  become: true
+  ansible.builtin.copy:
+    src: "{{ es_ssl_certificate_authority }}"
+    dest: "{{ es_ssl_certificate_path }}/{{ es_ssl_certificate_authority | basename }}"
+    owner: "{{ es_user }}"
+    group: "{{ es_group }}"
+    mode: "0640"
+    remote_src: "{{ es_ssl_remote_src }}"
+  when: es_ssl_upload | bool and es_ssl_certificate_authority | length > 0
+  notify: restart elasticsearch

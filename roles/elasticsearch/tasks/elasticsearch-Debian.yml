@@ -1,0 +1,94 @@
+---
+- name: set fact force_install to no
+  ansible.builtin.set_fact:
+    force_install: false
+
+- name: set fact force_install to yes
+  ansible.builtin.set_fact:
+    force_install: true
+  when: es_allow_downgrades
+
+- name: Install Elasticsearch repository
+  when: es_use_repository
+  become: true
+  block:
+    - name: Debian - Install repository prerequisites
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - gnupg
+          - curl
+        state: present
+
+    - name: Debian - Add Elasticsearch PGP key as a dearmored keyring
+      ansible.builtin.shell: |
+        set -o pipefail
+        curl -fsSL {{ es_apt_key_url }} | gpg --dearmor -o {{ es_apt_keyring }}
+      args:
+        creates: "{{ es_apt_keyring }}"
+        executable: /bin/bash
+      when: es_add_repository
+
+    - name: Debian - Add elasticsearch repository
+      ansible.builtin.apt_repository:
+        repo: "{{ es_apt_url }}"
+        state: present
+        filename: "elastic-{{ es_repo_name }}"
+      when: es_add_repository
+
+- name: Include optional user and group creation.
+  when: (es_user_id is defined) and (es_group_id is defined)
+  ansible.builtin.include_tasks: elasticsearch-optional-user.yml
+
+- name: Debian - Get installed elasticsearch version
+  ansible.builtin.command: dpkg-query --showformat='${Version}' --show {{ es_package_name }}
+  register: installed_es_version
+  failed_when: false
+  changed_when: false
+  check_mode: false
+
+- name: Debian - unhold elasticsearch version
+  become: true
+  ansible.builtin.dpkg_selections:
+    name: "{{ es_package_name }}"
+    selection: "install"
+  when: not es_version_lock or (installed_es_version.stdout | length > 0 and installed_es_version.stdout != es_version)
+
+- name: Debian - Ensure elasticsearch is installed
+  become: true
+  ansible.builtin.apt:
+    name: '{{ es_package_name }}{% if es_version is defined and es_version != "" %}={{ es_version }}{% endif %}'
+    state: present
+    force: "{{ force_install }}"
+    cache_valid_time: 86400
+  when: es_use_repository
+  register: debian_elasticsearch_install_from_repo
+  notify:
+    - restart elasticsearch
+    - reload systemd configuration
+  environment:
+    ES_PATH_CONF: "{{ es_conf_dir }}"
+
+- name: Debian - hold elasticsearch version
+  become: true
+  ansible.builtin.dpkg_selections:
+    name: "{{ es_package_name }}"
+    selection: "hold"
+  when: es_version_lock
+
+- name: set fact es_deb_url
+  ansible.builtin.set_fact:
+    es_deb_url: "{{ es_package_url }}-{{ es_version }}-amd64.deb"
+
+- name: Debian - Install Elasticsearch from url
+  become: true
+  ansible.builtin.apt:
+    deb: "{% if es_custom_package_url is defined %}{{ es_custom_package_url }}{% else %}{{ es_deb_url }}{% endif %}"
+    state: present
+  when: not es_use_repository
+  register: elasticsearch_install_from_package
+  notify:
+    - restart elasticsearch
+    - reload systemd configuration
+  environment:
+    ES_PATH_CONF: "{{ es_conf_dir }}"

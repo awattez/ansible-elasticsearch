@@ -1,0 +1,71 @@
+---
+# es_plugins_reinstall is forced to true when the ES package changed (version
+# change or fresh install) so plugins are rebuilt against the new version.
+- name: set fact es_plugins_reinstall to true
+  ansible.builtin.set_fact:
+    es_plugins_reinstall: true
+  when: >
+    ((debian_elasticsearch_install_from_repo is defined and debian_elasticsearch_install_from_repo.changed)
+    or (redhat_elasticsearch_install_from_repo is defined and redhat_elasticsearch_install_from_repo.changed)
+    or (elasticsearch_install_from_package is defined and elasticsearch_install_from_package.changed))
+    or es_plugins is not defined or es_plugins is none
+
+# List the plugin directories - the list command fails when the ES version
+# differs from the plugin version, so we cannot use it here.
+- name: Check installed elasticsearch plugins
+  become: true
+  ansible.builtin.command: "ls {{ es_home }}/plugins"
+  register: installed_plugins
+  changed_when: false
+  failed_when: false
+  environment:
+    ES_PATH_CONF: "{{ es_conf_dir }}"
+  check_mode: false
+
+# If es_plugins_reinstall is true we remove ALL plugins.
+- name: set fact plugins_to_remove to installed_plugins.stdout_lines
+  ansible.builtin.set_fact:
+    plugins_to_remove: "{{ installed_plugins.stdout_lines | default([]) }}"
+  when: es_plugins_reinstall
+
+# Otherwise remove only those installed but not listed in es_plugins.
+- name: set fact plugins_to_remove to plugins installed but not listed in es_plugins
+  ansible.builtin.set_fact:
+    plugins_to_remove: "{{ installed_plugins.stdout_lines | difference(es_plugins | map(attribute='plugin') | list) | default([]) }}"
+  when: not es_plugins_reinstall
+
+# If es_plugins_reinstall is true we (re)install ALL plugins.
+- name: set fact plugins_to_install to es_plugins
+  ansible.builtin.set_fact:
+    plugins_to_install: "{{ es_plugins | map(attribute='plugin') | list | default([]) }}"
+  when: es_plugins_reinstall
+
+# Otherwise install only those listed in es_plugins but not installed.
+- name: set fact plugins_to_install to those in es_plugins but not installed
+  ansible.builtin.set_fact:
+    plugins_to_install: "{{ es_plugins | map(attribute='plugin') | list | difference(installed_plugins.stdout_lines) | default([]) }}"
+  when: not es_plugins_reinstall
+
+# Remove currently installed plugins first to prevent reinstall errors.
+- name: Remove elasticsearch plugins
+  become: true
+  ansible.builtin.command: "{{ es_home }}/bin/elasticsearch-plugin remove {{ item }} --silent"
+  with_items: "{{ plugins_to_remove | default([]) }}"
+  notify: restart elasticsearch
+  register: plugin_removed
+  environment:
+    ES_PATH_CONF: "{{ es_conf_dir }}"
+
+- name: Install elasticsearch plugins
+  become: true
+  ansible.builtin.command: "{{ es_home }}/bin/elasticsearch-plugin install {{ item.url | default(item.plugin) }} --batch"
+  register: plugin_installed
+  changed_when: plugin_installed.rc | default(0) == 0
+  with_items: "{{ es_plugins }}"
+  when: item.plugin in plugins_to_install
+  notify: restart elasticsearch
+  environment:
+    ES_PATH_CONF: "{{ es_conf_dir }}"
+  until: plugin_installed.rc | default(0) == 0
+  retries: 5
+  delay: 5

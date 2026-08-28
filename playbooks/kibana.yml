@@ -1,0 +1,8 @@
+---
+# Deploy Kibana on the hosts of the `kibana` inventory group.
+#   ansible-playbook -i inventory.yml awattez.elastic.kibana
+- name: Deploy Kibana
+  hosts: kibana
+  become: true
+  roles:
+    - role: awattez.elastic.kibana

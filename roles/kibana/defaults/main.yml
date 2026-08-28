@@ -1,0 +1,27 @@
+---
+# Stack version - keep in sync with the elasticsearch role (same repo).
+es_version: "9.5.2"
+es_major_version: "{{ es_version.split('.')[0] }}.x"
+es_repo_name: "{{ es_major_version }}"
+
+# Package repository (shared with the elasticsearch role: same keyring, same
+# repo file, so colocating both roles on one host stays idempotent).
+es_use_repository: true
+es_add_repository: true
+es_repo_base: "https://artifacts.elastic.co"
+es_apt_key_url: "{{ es_repo_base }}/GPG-KEY-elasticsearch"
+es_apt_keyring: "/usr/share/keyrings/elasticsearch-keyring.gpg"
+es_apt_url: "deb [signed-by={{ es_apt_keyring }}] {{ es_repo_base }}/packages/{{ es_repo_name }}/apt stable main"
+
+kibana_package_name: "kibana"
+kibana_conf_dir: "/etc/kibana"
+
+# kibana.yml is rendered from this map - any Kibana setting goes here.
+# Computed defaults when absent: server.host 0.0.0.0,
+# elasticsearch.hosts ["http://localhost:9200"].
+kibana_config: {}
+
+kibana_start_service: true
+kibana_restart_on_change: true
+# Wait for the HTTP port after start (Kibana can take a minute to come up).
+kibana_wait_for_ready: true

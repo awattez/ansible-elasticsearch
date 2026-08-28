@@ -1,0 +1,20 @@
+---
+profile: moderate
+
+exclude_paths:
+  - .github/
+
+skip_list:
+  # The es_* variable names are the upstream role's public API - renaming them
+  # all to elasticsearch_* would break every existing consumer.
+  - var-naming[no-role-prefix]
+  # Cosmetic rules kept from the upstream code style - not worth a 200-line diff.
+  - name[casing]
+  - jinja[spacing]
+  # elasticsearch-keystore / elasticsearch-users / dnf versionlock have no
+  # reliable "already done" probe; tasks guard themselves with when: conditions.
+  - no-changed-when
+
+warn_list:
+  - ignore-errors
+  - yaml[line-length]

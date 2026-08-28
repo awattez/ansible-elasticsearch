@@ -1,0 +1,3 @@
+---
+default_file: "/etc/sysconfig/elasticsearch"
+es_home: "/usr/share/elasticsearch"

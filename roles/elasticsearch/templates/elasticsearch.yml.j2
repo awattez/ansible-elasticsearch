@@ -1,0 +1,73 @@
+{% if es_config %}
+{{ es_config | to_nice_yaml(indent=2) }}
+{% endif %}
+
+{% if es_config['cluster.name'] is not defined %}
+cluster.name: elasticsearch
+{% endif %}
+
+{% if es_config['node.name'] is not defined %}
+node.name: {{ inventory_hostname }}
+{% endif %}
+
+{% if es_config['network.host'] is not defined %}
+network.host: "0.0.0.0"
+{% endif %}
+
+{# Discovery is computed from the es_cluster_group inventory group unless the
+   inventory sets it explicitly: 1 host -> single-node, several hosts ->
+   seed_hosts (IPs) + initial_master_nodes (node names). #}
+{% set es_group_hosts = groups[es_cluster_group] | default([inventory_hostname]) %}
+{% if es_config['discovery.type'] is not defined and es_config['discovery.seed_hosts'] is not defined and es_config['discovery.seed_providers'] is not defined %}
+{% if es_group_hosts | length == 1 %}
+discovery.type: single-node
+{% else %}
+discovery.seed_hosts: [{% for h in es_group_hosts %}"{{ hostvars[h].ansible_host | default(h) }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+{% if es_config['cluster.initial_master_nodes'] is not defined %}
+cluster.initial_master_nodes: [{% for h in es_group_hosts %}"{{ hostvars[h]['es_config']['node.name'] | default(h) }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+{% endif %}
+{% endif %}
+{% endif %}
+
+#################################### Paths ####################################
+
+path.data: {{ es_data_dirs | join(',') }}
+
+path.logs: {{ es_log_dir }}
+
+{% if es_path_repo is defined %}
+path.repo: {{ es_path_repo }}
+{% endif %}
+
+action.auto_create_index: {{ es_action_auto_create_index | to_json }}
+
+{% if es_api_basic_auth_username is defined and es_api_basic_auth_password is defined %}
+#################################### Security ##################################
+
+{% if es_config['xpack.security.enabled'] is not defined %}
+xpack.security.enabled: true
+{% endif %}
+
+{% if es_enable_transport_ssl %}
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.verification_mode: "{{ es_ssl_verification_mode }}"
+xpack.security.transport.ssl.key: "{{ es_ssl_certificate_path }}/{{ es_ssl_key | basename }}"
+xpack.security.transport.ssl.certificate: "{{ es_ssl_certificate_path }}/{{ es_ssl_certificate | basename }}"
+{% if es_ssl_certificate_authority %}
+xpack.security.transport.ssl.certificate_authorities: "{{ es_ssl_certificate_path }}/{{ es_ssl_certificate_authority | basename }}"
+{% endif %}
+{% elif es_config['xpack.security.transport.ssl.enabled'] is not defined %}
+xpack.security.transport.ssl.enabled: false
+{% endif %}
+
+{% if es_enable_http_ssl %}
+xpack.security.http.ssl.enabled: true
+xpack.security.http.ssl.key: "{{ es_ssl_certificate_path }}/{{ es_ssl_key | basename }}"
+xpack.security.http.ssl.certificate: "{{ es_ssl_certificate_path }}/{{ es_ssl_certificate | basename }}"
+{% if es_ssl_certificate_authority %}
+xpack.security.http.ssl.certificate_authorities: "{{ es_ssl_certificate_path }}/{{ es_ssl_certificate_authority | basename }}"
+{% endif %}
+{% elif es_config['xpack.security.http.ssl.enabled'] is not defined %}
+xpack.security.http.ssl.enabled: false
+{% endif %}
+{% endif %}

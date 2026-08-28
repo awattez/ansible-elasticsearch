@@ -1,0 +1,9 @@
+---
+# Deploy the whole Elastic stack: every component whose inventory group is
+# present gets deployed, all the configuration is carried by the inventory.
+#   ansible-playbook -i inventory.yml awattez.elastic.all
+- name: Deploy Elasticsearch
+  ansible.builtin.import_playbook: awattez.elastic.elasticsearch
+
+- name: Deploy Kibana
+  ansible.builtin.import_playbook: awattez.elastic.kibana

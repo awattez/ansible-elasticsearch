@@ -1,0 +1,126 @@
+---
+# Configure Elasticsearch Node
+
+# Create conf directory
+- name: Create Configuration Directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ es_conf_dir }}"
+    state: directory
+    owner: root
+    group: "{{ es_group }}"
+    mode: "2750"
+
+# Create pid directory
+- name: Create PID Directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ es_pid_dir }}"
+    state: directory
+    owner: "{{ es_user }}"
+    group: "{{ es_group }}"
+    mode: "0755"
+
+# Create required directories
+- name: Create Others Directories
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ es_user }}"
+    group: "{{ es_group }}"
+    mode: "0750"
+  with_items:
+    - "{{ es_log_dir }}"
+    - "{{ es_data_dirs }}"
+
+# Copy the config template
+- name: Copy Configuration File
+  become: true
+  ansible.builtin.template:
+    src: elasticsearch.yml.j2
+    dest: "{{ es_conf_dir }}/elasticsearch.yml"
+    owner: root
+    group: "{{ es_group }}"
+    mode: "0660"
+    force: true
+  register: system_change
+  notify: restart elasticsearch
+
+# Copy the default file
+- name: Copy Default File
+  become: true
+  ansible.builtin.template:
+    src: "{{ es_config_default }}"
+    dest: "{{ default_file }}"
+    owner: root
+    group: "{{ es_group }}"
+    mode: "0660"
+    force: true
+  notify: restart elasticsearch
+
+# Systemd drop-in for memory lock / file descriptor limits
+- name: Configure systemd override
+  when: m_lock_enabled or es_max_open_files is defined
+  become: true
+  block:
+    - name: Make sure destination dir exists
+      ansible.builtin.file:
+        path: "{{ sysd_config_file | dirname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copy specific ElasticSearch Systemd config file
+      ansible.builtin.template:
+        src: "override.conf.j2"
+        dest: "{{ sysd_config_file }}"
+        owner: root
+        group: "{{ es_group }}"
+        mode: "0644"
+        force: true
+      notify:
+        - reload systemd configuration
+        - restart elasticsearch
+
+# Heap and extra JVM flags go into jvm.options.d/ (9.x practice) - the
+# packaged jvm.options stays untouched.
+- name: Ensure jvm.options.d directory exists
+  become: true
+  ansible.builtin.file:
+    path: "{{ es_conf_dir }}/jvm.options.d"
+    state: directory
+    owner: root
+    group: "{{ es_group }}"
+    mode: "2750"
+
+- name: Copy heap.options into jvm.options.d
+  become: true
+  ansible.builtin.template:
+    src: heap.options.j2
+    dest: "{{ es_conf_dir }}/jvm.options.d/heap.options"
+    owner: root
+    group: "{{ es_group }}"
+    mode: "0660"
+    force: true
+  when: es_heap_size is defined or es_jvm_custom_parameters | length > 0
+  notify: restart elasticsearch
+
+- name: Remove heap.options when nothing is customized
+  become: true
+  ansible.builtin.file:
+    path: "{{ es_conf_dir }}/jvm.options.d/heap.options"
+    state: absent
+  when: es_heap_size is not defined and es_jvm_custom_parameters | length == 0
+  notify: restart elasticsearch
+
+- name: Copy log4j2.properties File
+  become: true
+  ansible.builtin.template:
+    src: "{{ es_config_log4j2 }}"
+    dest: "{{ es_conf_dir }}/log4j2.properties"
+    owner: root
+    group: "{{ es_group }}"
+    mode: "0660"
+    force: true
+  notify: restart elasticsearch
+  when: es_config_log4j2 != ''

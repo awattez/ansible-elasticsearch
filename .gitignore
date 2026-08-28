@@ -1,10 +1,8 @@
-.kitchen/
 license*.json
 *.pyc
-.vendor
-.bundle
-Converging
-TODO
+__pycache__/
 .idea/
-elasticsearch.iml
-!/vars/RedHat.yml
+# ansible-galaxy collection build artifact
+awattez-elastic-*.tar.gz
+# local ansible-galaxy install cache
+.ansible/

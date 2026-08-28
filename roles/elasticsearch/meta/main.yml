@@ -1,0 +1,33 @@
+---
+allow_duplicates: true
+
+galaxy_info:
+  author: awattez
+  description: >-
+    Fork of the archived elastic.elasticsearch Ansible role, modernized for
+    Elasticsearch 9.x (security-first, systemd-only, jvm.options.d,
+    node.roles). Code hygiene inherited from the hostinger fork, certificate
+    generation ported from the philbudne fork.
+  namespace: awattez
+  role_name: elasticsearch
+  license: "license (Apache)"
+  min_ansible_version: "2.16"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+    - name: Debian
+      versions:
+        - bookworm
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+  galaxy_tags:
+    - elastic
+    - elasticsearch
+    - elk
+    - logging
+
+dependencies: []
