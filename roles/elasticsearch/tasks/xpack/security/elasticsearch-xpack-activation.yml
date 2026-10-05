@@ -9,7 +9,8 @@
     body: "{{ es_xpack_license }}"
     return_content: true
     force_basic_auth: true
-    validate_certs: "{{ es_validate_certs }}"
+    validate_certs: "{{ es_validate_certs | bool }}"
+    ca_path: "{{ es_api_ca_path | default(omit, true) }}"
   register: license_activated
   no_log: true
   failed_when: >

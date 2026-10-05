@@ -10,7 +10,8 @@
     status_code:
       - 200
       - 403
-    validate_certs: "{{ es_validate_certs }}"
+    validate_certs: "{{ es_validate_certs | bool }}"
+    ca_path: "{{ es_api_ca_path | default(omit, true) }}"
   register: trial_license_activated
   when: es_xpack_trial
 

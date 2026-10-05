@@ -23,7 +23,10 @@
 # this is how the role guarantees API access on a fresh 9.x cluster.
 - name: Create bootstrap password for elastic user
   become: true
-  ansible.builtin.shell: echo {{ es_api_basic_auth_password | quote }} | {{ es_home }}/bin/elasticsearch-keystore add -x 'bootstrap.password'
+  ansible.builtin.command: "{{ es_home }}/bin/elasticsearch-keystore add -x bootstrap.password"
+  args:
+    stdin: "{{ es_api_basic_auth_password }}"
+  notify: restart elasticsearch
   when:
     - es_api_basic_auth_username is defined
     - es_api_basic_auth_username == 'elastic'
@@ -34,7 +37,8 @@
 
 - name: Remove keystore entries
   become: true
-  ansible.builtin.command: "{{ es_home }}/bin/elasticsearch-keystore remove '{{ item.key }}'"
+  ansible.builtin.command: "{{ es_home }}/bin/elasticsearch-keystore remove {{ item.key | quote }}"
+  notify: restart elasticsearch
   with_items: "{{ es_keystore_entries }}"
   when:
     - es_keystore_entries is defined and es_keystore_entries | length > 0
@@ -56,7 +60,10 @@
 
 - name: Add keystore entries
   become: true
-  ansible.builtin.shell: echo {{ item.value | quote }} | {{ es_home }}/bin/elasticsearch-keystore add -x -f {{ item.key }}
+  ansible.builtin.command: "{{ es_home }}/bin/elasticsearch-keystore add -x -f {{ item.key | quote }}"
+  args:
+    stdin: "{{ item.value }}"
+  notify: restart elasticsearch
   with_items: "{{ es_keystore_entries }}"
   when:
     - es_keystore_entries is defined and es_keystore_entries | length > 0
@@ -71,7 +78,10 @@
 # setting, one entry per enabled TLS layer.
 - name: Add TLS key passphrase to the keystore
   become: true
-  ansible.builtin.shell: echo {{ es_ssl_key_passphrase | quote }} | {{ es_home }}/bin/elasticsearch-keystore add -x '{{ item.setting }}'
+  ansible.builtin.command: "{{ es_home }}/bin/elasticsearch-keystore add -x -f {{ item.setting }}"
+  args:
+    stdin: "{{ es_ssl_key_passphrase }}"
+  notify: restart elasticsearch
   loop:
     - setting: xpack.security.http.ssl.secure_key_passphrase
       enabled: "{{ es_enable_http_ssl }}"

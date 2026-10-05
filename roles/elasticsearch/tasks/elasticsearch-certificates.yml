@@ -32,6 +32,7 @@
 
     - name: Generate CA and per-node certificates
       ansible.builtin.shell: |
+        set -e
         {{ es_home }}/bin/elasticsearch-certutil ca --days 7300 --pem --silent --out {{ es_ssl_certificate_path }}/ca.zip
         unzip -o ca.zip
         {{ es_home }}/bin/elasticsearch-certutil cert --days 3650 --silent --pem \
@@ -44,6 +45,7 @@
         chmod 440 ca/ca.key
       args:
         chdir: "{{ es_ssl_certificate_path }}"
+        executable: /bin/bash
         creates: "{{ es_ssl_certificate_path }}/{{ groups[es_cluster_group][0] }}"
 
 - name: Read generated certificates from the first node

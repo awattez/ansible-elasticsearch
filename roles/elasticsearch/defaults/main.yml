@@ -47,6 +47,13 @@ es_max_open_files: 65536
 es_max_map_count: 262144
 es_allow_downgrades: false
 
+# Optional settings (unset by default):
+# es_path_repo: /mnt/snapshots              # path.repo
+# es_proxy_host / es_proxy_port: HTTP proxy for yum repo files and ES_JAVA_OPTS
+# es_domain: extra DNS name (per host) added to generated certificates
+# es_keystore_entries:                      # extra secure settings
+#   - { key: s3.client.default.access_key, value: "...", state: present, force: false }
+
 # Plugins.
 es_plugins_reinstall: false
 # es_plugins:
@@ -62,6 +69,10 @@ es_api_host: "localhost"
 es_api_port: 9200
 es_api_uri: "{{ es_api_scheme }}://{{ es_api_host }}:{{ es_api_port }}"
 es_license_api: "_license"
+# CA used to validate the API certificate (empty = system trust store).
+es_api_ca_path: >-
+  {{ (es_ssl_certificate_path ~ '/' ~ (es_ssl_certificate_authority | basename))
+  if (es_enable_http_ssl and es_ssl_certificate_authority | length > 0) else '' }}
 # es_api_basic_auth_username / es_api_basic_auth_password: required as soon as
 # security is on (always the case in 9.x unless explicitly disabled).
 
@@ -93,4 +104,4 @@ es_ssl_remote_src: false
 es_ssl_upload: true
 es_ssl_certificate_path: "{{ es_conf_dir }}/certs"
 es_ssl_verification_mode: "certificate"
-es_validate_certs: "yes"
+es_validate_certs: true
